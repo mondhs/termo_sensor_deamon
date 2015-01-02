@@ -8,6 +8,7 @@ import time
 import datetime 
 import atexit
 import stat
+import gammu
 
 
 
@@ -97,7 +98,7 @@ def readerator(fd):
         else:
             yield data
 
-def pipeWatcher():    
+def pipeWatcher_rm():    
     os.mknod(FIFO, 0666 | stat.S_IFIFO)
     print("The open() call will block until data is put into the FIFO.")
     fifo_in = os.open(FIFO, os.O_RDONLY)
@@ -105,21 +106,24 @@ def pipeWatcher():
     
     while True:
         for cc in readerator(fifo_in):
-            print(cc)
             sendSms(cc)
 
+def pipeWatcher():
+    fifo = open(FIFO, "r")
+    for line in fifo:
+        sendSms(cc)
+    fifo.close()
 
 os.system(os.environ['HOME'] + "/bin/gammu_unlock.sh")
 
 
-
+os.mkfifo(FIFO)
 logger.info("start sms service")
 
-# Loop forever, doing something useful hopefully:
-while True:
-	try:
-		pipeWatcher()
-	except (KeyboardInterrupt, SystemExit):
-		break
+try:
+    while True:
+	    pipeWatcher()
+except (KeyboardInterrupt, SystemExit):
+	break
 
 logger.info("stoping service")
