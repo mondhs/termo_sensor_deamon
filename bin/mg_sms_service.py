@@ -64,7 +64,8 @@ PHONE_NUMBER = "+37065042124"
 def sendSms(message):
 	logger.info("Send SMS with message: " + message + "; len: " + str(len(message)))
 	if len(message) > 150:
-		raise error('Message too long ') 
+		logging.error('Message too long ') 
+		message = message[:150]
 	sm = gammu.StateMachine()
 	sm.ReadConfig()
 	sm.Init()
@@ -83,47 +84,31 @@ def cleanup():
     try:
         os.unlink(FIFO)
     except:
-        pass
+        logging.error(sys.exc_info()[0])
 
-def readerator(fd):
-
-    """This reads data in a tight loop from a non-blocking file-descriptor.
-    When data is found it is yielded. A short sleep is added when no
-    data is available."""
-
-    while True:
-        data = os.read(fd, 150)
-        if not data:
-            time.sleep(READ_PIPE_EVERY_MIN_IN_SEC)
-        else:
-            yield data
-
-def pipeWatcher_rm():    
-    os.mknod(FIFO, 0666 | stat.S_IFIFO)
-    print("The open() call will block until data is put into the FIFO.")
-    fifo_in = os.open(FIFO, os.O_RDONLY)
-    print("The open() call has unblocked.")
-    
-    while True:
-        for cc in readerator(fifo_in):
-            sendSms(cc)
 
 def pipeWatcher():
     fifo = open(FIFO, "r")
     for line in fifo:
-        sendSms(cc)
+        try:
+            sendSms(line)
+        except:
+            logging.error(sys.exc_info()[0])
     fifo.close()
 
-os.system(os.environ['HOME'] + "/bin/gammu_unlock.sh")
-
-
-os.mkfifo(FIFO)
-logger.info("start sms service")
+#os.system(os.environ['HOME'] + "/bin/gammu_unlock.sh")
 
 try:
-    while True:
+    os.mkfifo(FIFO)
+except:    
+    logging.error(sys.exc_info()[0])
+
+logger.info("start sms service")
+
+while True:
+    try:
 	    pipeWatcher()
-except (KeyboardInterrupt, SystemExit):
+    except (KeyboardInterrupt, SystemExit):
 	break
 
 logger.info("stoping service")
