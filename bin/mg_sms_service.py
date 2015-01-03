@@ -23,7 +23,7 @@ parser.add_argument("-l", "--log", help="file to write log to (default '" + LOG_
 # If the log file is specified on the command line then override the default
 args = parser.parse_args()
 if args.log:
-	LOG_FILENAME = args.log
+    LOG_FILENAME = args.log
 
 # Configure logging to log to a file, making a new file at midnight and keeping the last 3 day's data
 # Give the logger a unique name (good practice)
@@ -41,41 +41,43 @@ logger.addHandler(handler)
 
 # Make a class we can use to capture stdout and sterr in the log
 class MyLogger(object):
-	def __init__(self, logger, level):
-		"""Needs a logger and a logger level."""
-		self.logger = logger
-		self.level = level
+    def __init__(self, logger, level):
+        """Needs a logger and a logger level."""
+        self.logger = logger
+        self.level = level
 
-	def write(self, message):
-		# Only log if there is a message (not just a new line)
-		if message.rstrip() != "":
-			self.logger.log(self.level, message.rstrip())
+    def write(self, message):
+        # Only log if there is a message (not just a new line)
+        if message.rstrip() != "":
+            self.logger.log(self.level, message.rstrip())
 
 # Replace stdout with logging to file at INFO level
-sys.stdout = MyLogger(logger, logging.INFO)
+#sys.stdout = MyLogger(logger, logging.INFO)
 # Replace stderr with logging to file at ERROR level
-sys.stderr = MyLogger(logger, logging.ERROR)
+#sys.stderr = MyLogger(logger, logging.ERROR)
 
 FIFO = '/var/local/mg_termo_service/message.fifo'
 READ_PIPE_EVERY_MIN_IN_SEC = 1#5 * 60
 PHONE_NUMBER = "+37065042124"
 
 
-def sendSms(message):
-	logger.info("Send SMS with message: " + message + "; len: " + str(len(message)))
-	if len(message) > 150:
-		logging.error('Message too long ') 
-		message = message[:150]
-	sm = gammu.StateMachine()
-	sm.ReadConfig()
-	sm.Init()
-	message = {
-	    'Text': message,
-	    'SMSC': {'Location': 1},
-	    'Number': PHONE_NUMBER,
-	}
-	#sm.SendSMS(message)
-	logger.info("Send SMS successfuly")
+def sendSms(message_content):
+    message_to_send = message_content
+    logger.info("Send SMS with message: {0}; len: {1}".format(message_to_send, str(len(message_to_send))))
+    if len(message_to_send) > 150:
+        message_to_send = message_to_send[:146]+"..."
+        logger.info("shorter message_to_send {0}".format(message_to_send))
+    sm = gammu.StateMachine()
+    sm.ReadConfig()
+    sm.Init()
+    smsMessage = {
+        'Text': message_to_send,
+        'SMSC': {'Location': 1},
+        'Number': PHONE_NUMBER,
+    }
+    #sm.SendSMS(smsMessage)
+    logger.info("Send SMS successfuly")
+    return message_to_send
 
 
 
@@ -83,32 +85,33 @@ def sendSms(message):
 def cleanup():
     try:
         os.unlink(FIFO)
-    except:
-        logging.error(sys.exc_info()[0])
+    except Exception, e:
+        logging.exception(e)
 
 
 def pipeWatcher():
     fifo = open(FIFO, "r")
     for line in fifo:
         try:
-            sendSms(line)
-        except:
-            logging.error(sys.exc_info()[0])
+            sentMessage = sendSms(line)
+        except Exception, e:
+            logging.exception(e)
     fifo.close()
 
 #os.system(os.environ['HOME'] + "/bin/gammu_unlock.sh")
 
 try:
     os.mkfifo(FIFO)
-except:    
-    logging.error(sys.exc_info()[0])
+except Exception, e:    
+    logging.exception(e)
 
 logger.info("start sms service")
 
 while True:
     try:
-	    pipeWatcher()
+        pipeWatcher()
+        time.sleep(READ_PIPE_EVERY_MIN_IN_SEC)
     except (KeyboardInterrupt, SystemExit):
-	break
+        break
 
 logger.info("stoping service")

@@ -56,6 +56,7 @@ sys.stderr = MyLogger(logger, logging.ERROR)
 
 SMS_FILE_NAME = "/var/local/mg_termo_service/sms_queue.csv"
 ALARM_FILE_NAME = "/var/local/mg_termo_service/alarm.txt"
+FIFO = '/var/local/mg_termo_service/message.fifo'
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 ROWS_IN_FILE = 100
 
@@ -76,12 +77,13 @@ def my_callback(channel):
         with open(ALARM_FILE_NAME,"r") as f:
     	    data = f.readline()
             lastNotified = datetime.datetime.strptime(data, DATE_FORMAT)
-	delta = (eventDate - lastNotified).total_seconds()
+            
+	    delta = (eventDate - lastNotified).total_seconds()
         logger.info("delta.total_seconds(): " + str(delta) + "; started: " + lastNotified.strftime("%Y%m%d") + "; event: " + eventDate.strftime("%Y%m%d")  )
-	with open(SMS_FILE_NAME, "a") as outFile:
-            outFile.write("{};Alarmas suaktyvintas.\n".format(eventDate.strftime(DATE_FORMAT)))
-        with open(ALARM_FILE_NAME, 'w') as f:
-            f.write(datetime.datetime.now().strftime(DATE_FORMAT))
+        with open(FIFO, 'a') as fifo:
+            fifo.write("{};Alarmas suaktyvintas.\n".format(eventDate.strftime(DATE_FORMAT)))
+            with open(ALARM_FILE_NAME, 'w') as f:
+                f.write(datetime.datetime.now().strftime(DATE_FORMAT))
 
 
 GPIO.add_event_detect(23, GPIO.BOTH, callback=my_callback, bouncetime=500)
