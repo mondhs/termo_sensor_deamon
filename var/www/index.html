@@ -1,8 +1,19 @@
 <html>
   <head>
     <meta http-equiv='content-type' content='text/html; charset=UTF-16' />
-    <script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1','packages':['annotationchart']}]}"></script>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    
     <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <script type="text/javascript" src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    
+    
+
+    <script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1.1','packages':['annotationchart'], 'language': 'lt'}]}"></script>
+
     <script type='text/javascript'>
       google.load('visualization', '1', {'packages':['corechart']});
       google.setOnLoadCallback(drawChart);
@@ -11,27 +22,30 @@
          var allTextLines = allText.split(/\r\n|\n/);
          var headers = allTextLines[0].split(',');
          var lines = [];
-
+         var lastNumber = 0;         
        for (var i=1; i<allTextLines.length; i++) {
             var data = allTextLines[i].split(',');
             var tarr = [];
             if(data[2] && data[1]){
-                tarr.push(new Date(data[2].trim()));
+                tarr.push(new Date(data[2].trim()+"+02:00"));
                 tarr.push(parseFloat(data[1].trim()));
                 tarr.push(data[3]?data[3]:null);
                 lines.push(tarr);
+                number = parseInt(data[0]);
+                lastNumber = number != 0?number:lastNumber;
             }
         }
-        lines.push();
-        return lines
+        tuple = { allData:lines, lastNumber:lastNumber };
+        return tuple;
       }
       
-      function loadData(){
-          var loaddedData = [];
+      function loadData(page){
+          var pageQuery = page == 0?"":""+page
+          var loaddedData = {allData:[], lastNumber:0};
           $.ajax({
             type: "GET",
             async: false,
-            url: "data_archive.csv",
+            url: "data.php?page="+pageQuery,
             dataType: "text",
             success: function(data) {
                 loaddedData = processData(data);
@@ -40,41 +54,79 @@
          return loaddedData;
       }
       
+      function getPageNum(){
+        var page = "";
+        if (window.location.hash){
+            page = window.location.hash.slice(1)
+        }
+        page =  page == "" ? "0": page;
+        return parseInt(page);
+     }
+
+    function updateLinks(lastNumber, currentPage){
+        var pages = [];
+        $.ajax({
+            type: "GET",
+            dataType: "json",
+            async: false,
+            url: "list.php",
+            success: function(data) {
+                pages = data;
+                //console.log(JSON.stringify(data));
+            }
+         });
+         $("#pages").empty();
+         $.each(pages, function( index, value ) {
+             var pageControl = $( "<li><a href='#"+value+"'>"+index+"</a></li>" );
+             pageControl.addClass(currentPage == value?"disabled":"active");
+             $("#pages").append(pageControl);
+         });
+         
+        
+        $("li.active>a").click(function(){
+            var movingToPage = this.hash.slice(1);
+            console.log("movingToPage: " + movingToPage);
+            history.pushState(null, null, '#'+movingToPage);
+            drawChart();
+        });
+    }
+      
       function drawChart() {
         var data = new google.visualization.DataTable();
         data.addColumn('date', 'Data');
         data.addColumn('number', 'ateina į grindis');
         data.addColumn({type:'string', role:'annotation'});
 
-        var loadedData = loadData();
+
+        var loadedData = loadData(getPageNum());
+        updateLinks(loadedData.lastNumber,getPageNum());
+        
         //console.log(JSON.stringify(loadedData));
-        data.addRows( loadedData);
+        data.addRows( loadedData.allData);
 
 /*        data.addRows(        
         [
-            [ new Date("2015-01-03T11:48:43"),17.562], 
-            [ new Date("2015-01-03T11:53:44"), 17.687], 
-            [ new Date("2015-01-03T11:58:45"),17.562], 
-            [ new Date("2015-01-03T12:03:46"),17.562], 
-            [ new Date("2015-01-03T12:08:48"),17.625], 
-            [ new Date("2015-01-03T12:13:48"),17.562], 
-            [ new Date("2015-01-03T12:18:49"),17.5], 
-            [ new Date("2015-01-03T12:23:50"),17.437], 
-            [ new Date("2015-01-03T12:28:51"),17.437], 
-            [ new Date("2015-01-03T12:33:52"),17.375], 
-            [ new Date("2015-01-03T12:38:53"),17.437], 
-            [ new Date("2015-01-03T12:43:54"),17.5], 
-            [ new Date("2015-01-03T12:48:55"),17.437],
-            [ new Date("2015-01-03T11:48:43"),0,"Alarmas"]
+            [ new Date("2015-01-03T11:48:43"),17.562,null], 
+            [ new Date("2015-01-03T11:53:44"), 17.687,null], 
+            [ new Date("2015-01-03T11:58:45"),17.562,null], 
+            [ new Date("2015-01-03T12:03:46"),17.562,null], 
+            [ new Date("2015-01-03T12:08:48"),17.625,null], 
+            [ new Date("2015-01-03T12:13:48"),17.562,"ALARM"], 
+            [ new Date("2015-01-03T12:18:49"),17.5,null], 
+            [ new Date("2015-01-03T12:23:50"),17.437,null], 
+            [ new Date("2015-01-03T12:28:51"),17.437,null], 
+            [ new Date("2015-01-03T12:33:52"),17.375,null], 
+            [ new Date("2015-01-03T12:38:53"),17.437,null], 
+            [ new Date("2015-01-03T12:43:54"),17.5,null], 
+            [ new Date("2015-01-03T12:48:55"),17.437,null],
+            [ new Date("2015-01-03T11:48:43"),17.437,"ALARM"]
         ]);*/
 
         var chart = new google.visualization.AnnotationChart(document.getElementById('chart_div'));
 
         var options = {
           //displayAnnotations: true
-          title: 'Temperatūros',
-          vAxis: {title: 'C'},
-          annotation: {style: 'line'}
+          thickness: 1
 
         };
 
@@ -83,7 +135,16 @@
     </script>
   </head>
   <body>
-    <div id='chart_div' style='width: 900px; height: 500px;'></div>
+    <div class="container">
+        <div class="row">
+            <div id='chart_div' style='width: 900px; height: 500px;'></div>
+        </div>
+        <div class="row">
+            <div class="col-md-12 text-center">
+                <ul class="pagination" id="pages"/>
+            </div>
+        </div>
+    </div>
   </body>
 </html>
 
