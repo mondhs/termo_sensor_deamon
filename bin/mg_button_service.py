@@ -11,7 +11,7 @@ import RPi.GPIO as GPIO
 
 
 # Deafults
-LOG_FILENAME = "/tmp/mg_termo_service.log"
+LOG_FILENAME = "/tmp/mg_button_service.log"
 LOG_LEVEL = logging.INFO  # Could be e.g. "DEBUG" or "WARNING"
 
 # Define and parse command line arguments
@@ -54,23 +54,30 @@ sys.stdout = MyLogger(logger, logging.INFO)
 # Replace stderr with logging to file at ERROR level
 sys.stderr = MyLogger(logger, logging.ERROR)
 
-SMS_FILE_NAME = "/var/local/mg_termo_service/sms_queue.csv"
 ALARM_FILE_NAME = "/var/local/mg_termo_service/alarm.txt"
-FIFO = '/var/local/mg_termo_service/message.fifo'
+NOTIFY_FIFO = '/var/local/mg_termo_service/message.fifo'
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 ROWS_IN_FILE = 100
+NOTIFY_EVERY_SEC = 4# * 3600
 
 
 GPIO.setmode(GPIO.BCM)
 
 GPIO.setup(23, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
+def sendSms(message):
+	logger.info("Send SMS with message: " + message + "; len: " + str(len(message)))
+	if stat.S_ISFIFO(os.stat(NOTIFY_FIFO).st_mode):
+        with open(NOTIFY_FIFO, 'a') as fifo:
+            fifo.write(message)
+	    logger.info("Send SMS successfuly")
+	else:
+	    logger.info("NOT Send SMS. service not running")
+
 # Define a threaded callback function to run in another thread when events are detected
 def my_callback(channel):
     if GPIO.input(23):     # if port 23 == 1
-        #print "Rising edge detected on 23"
-	pass
-    else:                  # if port 23 != 1
+        logger.info("Rising edge detected on 23")
         print "Alarm triggered"
         eventDate = datetime.datetime.now()
         lastNotified = datetime.datetime.now() - datetime.timedelta(weeks=4)
@@ -80,15 +87,18 @@ def my_callback(channel):
             
 	    delta = (eventDate - lastNotified).total_seconds()
         logger.info("delta.total_seconds(): " + str(delta) + "; started: " + lastNotified.strftime("%Y%m%d") + "; event: " + eventDate.strftime("%Y%m%d")  )
-        with open(FIFO, 'a') as fifo:
-            fifo.write("{};Alarmas suaktyvintas.\n".format(eventDate.strftime(DATE_FORMAT)))
+        if delta > NOTIFY_EVERY_SEC:
+            sendSms("{}; Alarmas suaktyvintas.\n".format(eventDate.strftime(DATE_FORMAT)))
             with open(ALARM_FILE_NAME, 'w') as f:
                 f.write(datetime.datetime.now().strftime(DATE_FORMAT))
+    else:                  # if port 23 != 1
+        logger.info("falling edge detected on 23")
+    	pass
 
 
 GPIO.add_event_detect(23, GPIO.BOTH, callback=my_callback, bouncetime=500)
 
-logger.info("start service")
+logger.info("start button service")
 
 lastNotified = datetime.datetime.now() - datetime.timedelta(weeks=4)
 with open(ALARM_FILE_NAME, 'w') as f:

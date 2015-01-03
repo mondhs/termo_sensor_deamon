@@ -3,11 +3,11 @@
 import logging
 import logging.handlers
 import argparse
-import sys,os
+import sys,os, stat
 import time  # this is only being used as part of the example
 from w1thermsensor import W1ThermSensor
 import datetime 
-import gammu
+
 
 
 
@@ -56,11 +56,11 @@ sys.stdout = MyLogger(logger, logging.INFO)
 sys.stderr = MyLogger(logger, logging.ERROR)
 
 FILE_NAME = "/var/local/mg_termo_service/data_archive.csv"
+NOTIFY_FIFO = '/var/local/mg_termo_service/message.fifo'
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 ROWS_IN_FILE = 100
-NOTIFY_EVERY_HOUR_IN_SEC = 4 * 3600
-READ_SENSOR_EVERY_MIN_IN_SEC = 5 * 60
-PHONE_NUMBER = "+37065042124"
+NOTIFY_EVERY_SEC = 4 * 3600
+READ_SENSOR_EVERY_SEC = 5 * 60
 
 def initReadings():
 	readingIndex = 0
@@ -82,18 +82,12 @@ def initReadings():
 
 def sendSms(message):
 	logger.info("Send SMS with message: " + message + "; len: " + str(len(message)))
-	if len(message) > 150:
-		raise error('Message too long ') 
-	sm = gammu.StateMachine()
-	sm.ReadConfig()
-	sm.Init()
-	message = {
-	    'Text': message,
-	    'SMSC': {'Location': 1},
-	    'Number': PHONE_NUMBER,
-	}
-	#sm.SendSMS(message)
-	logger.info("Send SMS successfuly")
+	if stat.S_ISFIFO(os.stat(NOTIFY_FIFO).st_mode):
+        with open(NOTIFY_FIFO, 'a') as fifo:
+            fifo.write(message)
+	    logger.info("Send SMS successfuly")
+	else:
+	    logger.info("NOT Send SMS. service not running")
 
 
 
@@ -104,13 +98,13 @@ def reportStatus(eventDate, temperature):
 def logData(index, temperature, eventDate, lastNotified):
 	dateStr = eventDate.strftime(DATE_FORMAT)
 	delta = (eventDate - lastNotified).total_seconds()
-	logger.info("delta.total_seconds(): " + str(delta) + "; started: " + lastNotified.strftime("%Y%m%d") + "; event: " + eventDate.strftime("%Y%m%d") + "; report? " + str(delta > NOTIFY_EVERY_HOUR_IN_SEC) )
+	logger.info("delta.total_seconds(): " + str(delta) + "; started: " + lastNotified.strftime("%Y%m%d") + "; event: " + eventDate.strftime("%Y%m%d") + "; report? " + str(delta > NOTIFY_EVERY_SEC) )
 	logger.info("index :" + str(index) + "; mod: " + str(index % ROWS_IN_FILE) +  "; div: " + str(index/ROWS_IN_FILE))
 	if index % ROWS_IN_FILE == 0:
 		moveTo = FILE_NAME+str(index/ROWS_IN_FILE)
 		logger.info("Move file to" + moveTo)
 		os.rename(FILE_NAME, moveTo)	
-	if delta > NOTIFY_EVERY_HOUR_IN_SEC:
+	if delta > NOTIFY_EVERY_SEC:
 		reportStatus(eventDate, temperature)
 		lastNotified=eventDate
 	message = "{}, {}, {}\n".format(str(index), str(temperature), dateStr)
@@ -141,7 +135,7 @@ readingIndex += 1
 while True:
 	try:
 		readingIndex, lastNotified = readSensors(readingIndex, lastNotified)
-		time.sleep(READ_SENSOR_EVERY_MIN_IN_SEC)
+		time.sleep(READ_SENSOR_EVERY_SEC)
 	except (KeyboardInterrupt, SystemExit):
 		break
 

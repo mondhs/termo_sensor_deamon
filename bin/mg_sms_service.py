@@ -56,7 +56,7 @@ class MyLogger(object):
 # Replace stderr with logging to file at ERROR level
 #sys.stderr = MyLogger(logger, logging.ERROR)
 
-FIFO = '/var/local/mg_termo_service/message.fifo'
+NOTIFY_FIFO = '/var/local/mg_termo_service/message.fifo'
 READ_PIPE_EVERY_MIN_IN_SEC = 1#5 * 60
 PHONE_NUMBER = "+37065042124"
 
@@ -84,24 +84,24 @@ def sendSms(message_content):
 @atexit.register
 def cleanup():
     try:
-        os.unlink(FIFO)
+        os.unlink(NOTIFY_FIFO)
     except Exception, e:
         logging.exception(e)
 
 
 def pipeWatcher():
-    fifo = open(FIFO, "r")
-    for line in fifo:
-        try:
-            sentMessage = sendSms(line)
-        except Exception, e:
-            logging.exception(e)
+    fifo = open(NOTIFY_FIFO, "r")
+    allLines = fifo.readlines()
+    try:
+        sentMessage = sendSms(",".join(allLines))
+    except Exception, e:
+        logging.exception(e)
     fifo.close()
 
 #os.system(os.environ['HOME'] + "/bin/gammu_unlock.sh")
 
 try:
-    os.mkfifo(FIFO)
+    os.mkfifo(NOTIFY_FIFO)
 except Exception, e:    
     logging.exception(e)
 
