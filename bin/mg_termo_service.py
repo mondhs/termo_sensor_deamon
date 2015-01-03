@@ -51,11 +51,11 @@ class MyLogger(object):
             self.logger.log(self.level, message.rstrip())
 
 # Replace stdout with logging to file at INFO level
-sys.stdout = MyLogger(logger, logging.INFO)
+#sys.stdout = MyLogger(logger, logging.INFO)
 # Replace stderr with logging to file at ERROR level
-sys.stderr = MyLogger(logger, logging.ERROR)
+#sys.stderr = MyLogger(logger, logging.ERROR)
 
-FILE_NAME = "/var/local/mg_termo_service/data_archive.csv"
+DATA_FILE_NAME = "/var/local/mg_termo_service/data_archive.csv"
 NOTIFY_FIFO = '/var/local/mg_termo_service/message.fifo'
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 ROWS_IN_FILE = 100
@@ -68,12 +68,11 @@ def initReadings():
     try:
         lastReadings = []
         firstReadings = []
-        with open(FILE_NAME) as inFile:
+        with open(DATA_FILE_NAME) as inFile:
             allReadings = inFile.readlines()
             firstReadings = allReadings[0].split(",")
-                lastReadings = allReadings[-1].split(",")
-         lastNumber = lastReadings[0].strip()
-
+            lastReadings = allReadings[-1].split(",")
+            lastNumber = lastReadings[0].strip()
             scriptStarted = datetime.datetime.strptime(firstReadings[2].strip(), DATE_FORMAT)
             readingIndex = int(lastNumber)
     except (IndexError,IOError):
@@ -101,14 +100,14 @@ def logData(index, temperature, eventDate, lastNotified):
     logger.info("delta.total_seconds(): " + str(delta) + "; started: " + lastNotified.strftime("%Y%m%d") + "; event: " + eventDate.strftime("%Y%m%d") + "; report? " + str(delta > NOTIFY_EVERY_SEC) )
     logger.info("index :" + str(index) + "; mod: " + str(index % ROWS_IN_FILE) +  "; div: " + str(index/ROWS_IN_FILE))
     if index % ROWS_IN_FILE == 0:
-        moveTo = FILE_NAME+str(index/ROWS_IN_FILE)
+        moveTo = DATA_FILE_NAME+str(index/ROWS_IN_FILE)
         logger.info("Move file to" + moveTo)
-        os.rename(FILE_NAME, moveTo)    
+        os.rename(DATA_FILE_NAME, moveTo)    
     if delta > NOTIFY_EVERY_SEC:
         reportStatus(eventDate, temperature)
         lastNotified=eventDate
     message = "{}, {}, {}\n".format(str(index), str(temperature), dateStr)
-    with open(FILE_NAME, "a") as outFile:
+    with open(DATA_FILE_NAME, "a") as outFile:
         outFile.write(message)
     return lastNotified
 

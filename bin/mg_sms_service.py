@@ -52,12 +52,12 @@ class MyLogger(object):
             self.logger.log(self.level, message.rstrip())
 
 # Replace stdout with logging to file at INFO level
-#sys.stdout = MyLogger(logger, logging.INFO)
+sys.stdout = MyLogger(logger, logging.INFO)
 # Replace stderr with logging to file at ERROR level
-#sys.stderr = MyLogger(logger, logging.ERROR)
+sys.stderr = MyLogger(logger, logging.ERROR)
 
 NOTIFY_FIFO = '/var/local/mg_termo_service/message.fifo'
-READ_PIPE_EVERY_MIN_IN_SEC = 1#5 * 60
+READ_PIPE_EVERY_SEC = 1 * 60
 PHONE_NUMBER = "+37065042124"
 
 
@@ -86,7 +86,7 @@ def cleanup():
     try:
         os.unlink(NOTIFY_FIFO)
     except Exception, e:
-        logging.exception(e)
+        logger.exception(e)
 
 
 def pipeWatcher():
@@ -95,7 +95,7 @@ def pipeWatcher():
     try:
         sentMessage = sendSms(",".join(allLines))
     except Exception, e:
-        logging.exception(e)
+        logger.exception(e)
     fifo.close()
 
 #os.system(os.environ['HOME'] + "/bin/gammu_unlock.sh")
@@ -103,16 +103,19 @@ def pipeWatcher():
 try:
     if stat.S_ISFIFO(os.stat(NOTIFY_FIFO).st_mode):
         cleanup()
+except Exception, e:    
+    logger.exception(e)
+try:
     os.mkfifo(NOTIFY_FIFO, 0666)
 except Exception, e:    
-    logging.exception(e)
+    logger.exception(e)
 
-logger.info("start sms service")
+logger.info("start sms service. phone %s every %i sec", PHONE_NUMBER, READ_PIPE_EVERY_SEC)
 
 while True:
     try:
         pipeWatcher()
-        time.sleep(READ_PIPE_EVERY_MIN_IN_SEC)
+        time.sleep(READ_PIPE_EVERY_SEC)
     except (KeyboardInterrupt, SystemExit):
         break
 

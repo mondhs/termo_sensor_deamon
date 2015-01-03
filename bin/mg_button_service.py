@@ -55,15 +55,28 @@ sys.stdout = MyLogger(logger, logging.INFO)
 sys.stderr = MyLogger(logger, logging.ERROR)
 
 ALARM_FILE_NAME = "/var/local/mg_termo_service/alarm.txt"
+DATA_FILE_NAME = "/var/local/mg_termo_service/data_archive.csv"
 NOTIFY_FIFO = '/var/local/mg_termo_service/message.fifo'
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
-ROWS_IN_FILE = 100
-NOTIFY_EVERY_SEC = 4# * 3600
+NOTIFY_EVERY_SEC = 60#4 * 3600
 
 
 GPIO.setmode(GPIO.BCM)
 
 GPIO.setup(23, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+def isNotificationNeeded(eventDate):
+    lastNotified = datetime.datetime.now() - datetime.timedelta(weeks=4)
+    with open(ALARM_FILE_NAME,"r") as f:
+        data = f.readline()
+        lastNotified = datetime.datetime.strptime(data, DATE_FORMAT)
+    logger.info("Last notified: " + data)
+            
+    delta = (eventDate - lastNotified).total_seconds()
+    logger.info("delta.total_seconds(): " + str(delta) + "; started: " + lastNotified.strftime("%Y%m%d") + "; event: " + eventDate.strftime("%Y%m%d")  + "; report? " + str(delta > NOTIFY_EVERY_SEC)  )
+    return delta > NOTIFY_EVERY_SEC
+
+    
 
 def sendSms(message):
     logger.info("Send SMS with message: " + message + "; len: " + str(len(message)))
@@ -74,23 +87,33 @@ def sendSms(message):
     else:
         logger.info("NOT Send SMS. service not running")
 
+
+def recordData(eventDate):
+    eventDateStr = eventDate.strftime(DATE_FORMAT)
+    lastTemperature = 0
+    with open(DATA_FILE_NAME,"r") as inFile:
+        allReadings = inFile.readlines()
+        lastReadings = allReadings[-1].split(",")
+        lastTemperature = lastReadings[1].strip()
+    logger.info("Last temperature: " + lastTemperature)
+    with open(ALARM_FILE_NAME, 'w') as f:
+        f.write(eventDateStr)
+    data_message = "0, {}, {}, {}\n".format( str(lastTemperature), eventDateStr, "ALARM")
+    with open(DATA_FILE_NAME, "a") as outFile:
+        outFile.write(data_message)
+    sms_message = "Alarmas! pas mane {}. temp1: {}".format(eventDateStr, str(lastTemperature))
+    sendSms(sms_message)
+
+
+
 # Define a threaded callback function to run in another thread when events are detected
 def my_callback(channel):
     if GPIO.input(23):     # if port 23 == 1
         logger.info("Rising edge detected on 23")
         print "Alarm triggered"
         eventDate = datetime.datetime.now()
-        lastNotified = datetime.datetime.now() - datetime.timedelta(weeks=4)
-        with open(ALARM_FILE_NAME,"r") as f:
-            data = f.readline()
-            lastNotified = datetime.datetime.strptime(data, DATE_FORMAT)
-            
-        delta = (eventDate - lastNotified).total_seconds()
-        logger.info("delta.total_seconds(): " + str(delta) + "; started: " + lastNotified.strftime("%Y%m%d") + "; event: " + eventDate.strftime("%Y%m%d")  )
-        if delta > NOTIFY_EVERY_SEC:
-            sendSms("{}; Alarmas suaktyvintas.\n".format(eventDate.strftime(DATE_FORMAT)))
-            with open(ALARM_FILE_NAME, 'w') as f:
-                f.write(datetime.datetime.now().strftime(DATE_FORMAT))
+        if isNotificationNeeded(eventDate):
+            recordData(eventDate)
     else:                  # if port 23 != 1
         logger.info("falling edge detected on 23")
         pass
@@ -104,7 +127,7 @@ lastNotified = datetime.datetime.now() - datetime.timedelta(weeks=4)
 with open(ALARM_FILE_NAME, 'w') as f:
     f.write(datetime.datetime.now().strftime(DATE_FORMAT))
 
-
+recordData(datetime.datetime.now())
 
 try:
     while True:
