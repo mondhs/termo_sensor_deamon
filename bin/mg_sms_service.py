@@ -101,7 +101,9 @@ def pipeWatcher():
 #os.system(os.environ['HOME'] + "/bin/gammu_unlock.sh")
 
 try:
-    os.mkfifo(NOTIFY_FIFO)
+    if stat.S_ISFIFO(os.stat(NOTIFY_FIFO).st_mode):
+        cleanup()
+    os.mkfifo(NOTIFY_FIFO, 0666)
 except Exception, e:    
     logging.exception(e)
 

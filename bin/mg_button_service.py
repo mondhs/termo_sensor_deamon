@@ -3,7 +3,7 @@
 import logging
 import logging.handlers
 import argparse
-import sys,os
+import sys,os, stat
 import time  # this is only being used as part of the example
 import datetime 
 import RPi.GPIO as GPIO
@@ -21,7 +21,7 @@ parser.add_argument("-l", "--log", help="file to write log to (default '" + LOG_
 # If the log file is specified on the command line then override the default
 args = parser.parse_args()
 if args.log:
-	LOG_FILENAME = args.log
+    LOG_FILENAME = args.log
 
 # Configure logging to log to a file, making a new file at midnight and keeping the last 3 day's data
 # Give the logger a unique name (good practice)
@@ -39,15 +39,15 @@ logger.addHandler(handler)
 
 # Make a class we can use to capture stdout and sterr in the log
 class MyLogger(object):
-	def __init__(self, logger, level):
-		"""Needs a logger and a logger level."""
-		self.logger = logger
-		self.level = level
+    def __init__(self, logger, level):
+        """Needs a logger and a logger level."""
+        self.logger = logger
+        self.level = level
 
-	def write(self, message):
-		# Only log if there is a message (not just a new line)
-		if message.rstrip() != "":
-			self.logger.log(self.level, message.rstrip())
+    def write(self, message):
+        # Only log if there is a message (not just a new line)
+        if message.rstrip() != "":
+            self.logger.log(self.level, message.rstrip())
 
 # Replace stdout with logging to file at INFO level
 sys.stdout = MyLogger(logger, logging.INFO)
@@ -66,13 +66,13 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(23, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 def sendSms(message):
-	logger.info("Send SMS with message: " + message + "; len: " + str(len(message)))
-	if stat.S_ISFIFO(os.stat(NOTIFY_FIFO).st_mode):
+    logger.info("Send SMS with message: " + message + "; len: " + str(len(message)))
+    if stat.S_ISFIFO(os.stat(NOTIFY_FIFO).st_mode):
         with open(NOTIFY_FIFO, 'a') as fifo:
             fifo.write(message)
-	    logger.info("Send SMS successfuly")
-	else:
-	    logger.info("NOT Send SMS. service not running")
+        logger.info("Send SMS successfuly")
+    else:
+        logger.info("NOT Send SMS. service not running")
 
 # Define a threaded callback function to run in another thread when events are detected
 def my_callback(channel):
@@ -82,10 +82,10 @@ def my_callback(channel):
         eventDate = datetime.datetime.now()
         lastNotified = datetime.datetime.now() - datetime.timedelta(weeks=4)
         with open(ALARM_FILE_NAME,"r") as f:
-    	    data = f.readline()
+            data = f.readline()
             lastNotified = datetime.datetime.strptime(data, DATE_FORMAT)
             
-	    delta = (eventDate - lastNotified).total_seconds()
+        delta = (eventDate - lastNotified).total_seconds()
         logger.info("delta.total_seconds(): " + str(delta) + "; started: " + lastNotified.strftime("%Y%m%d") + "; event: " + eventDate.strftime("%Y%m%d")  )
         if delta > NOTIFY_EVERY_SEC:
             sendSms("{}; Alarmas suaktyvintas.\n".format(eventDate.strftime(DATE_FORMAT)))
@@ -93,7 +93,7 @@ def my_callback(channel):
                 f.write(datetime.datetime.now().strftime(DATE_FORMAT))
     else:                  # if port 23 != 1
         logger.info("falling edge detected on 23")
-    	pass
+        pass
 
 
 GPIO.add_event_detect(23, GPIO.BOTH, callback=my_callback, bouncetime=500)
