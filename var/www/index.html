@@ -18,34 +18,33 @@
       google.load('visualization', '1', {'packages':['corechart']});
       google.setOnLoadCallback(drawChart);
       function processData(allText){
-        //alert(data);
-         var allTextLines = allText.split(/\r\n|\n/);
-         var headers = allTextLines[0].split(',');
-         var lines = [];
-         var lastNumber = 0;         
-       for (var i=1; i<allTextLines.length; i++) {
-            var data = allTextLines[i].split(',');
-            var tarr = [];
-            if(data[2] && data[1]){
-                tarr.push(new Date(data[2].trim()+"+02:00"));
-                tarr.push(parseFloat(data[1].trim()));
-                tarr.push(data[3]?data[3]:null);
-                lines.push(tarr);
-                number = parseInt(data[0]);
-                lastNumber = number != 0?number:lastNumber;
+           //alert(data);
+           var allTextLines = allText.split(/\r\n|\n/);
+           var headers = allTextLines[0].split(',');
+           var lines = [];
+           var lastNumber = 0;         
+           for (var i=1; i<allTextLines.length; i++) {
+                var data = allTextLines[i].split(',');
+                var tarr = [];
+                if(data[2] && data[1]){
+                    tarr.push(new Date(data[2].trim()+"+02:00"));
+                    tarr.push(parseFloat(data[1].trim()));
+                    tarr.push(data[3]?data[3]:null);
+                    lines.push(tarr);
+                    number = parseInt(data[0]);
+                    lastNumber = number != 0?number:lastNumber;
+                }
             }
-        }
-        tuple = { allData:lines, lastNumber:lastNumber };
-        return tuple;
+            tuple = { allData:lines, lastNumber:lastNumber };
+            return tuple;
       }
       
       function loadData(page){
-          var pageQuery = page == 0?"":""+page
           var loaddedData = {allData:[], lastNumber:0};
           $.ajax({
             type: "GET",
             async: false,
-            url: "data.php?page="+pageQuery,
+            url: "data.php?page="+page,
             dataType: "text",
             success: function(data) {
                 loaddedData = processData(data);
@@ -61,7 +60,7 @@
         }
         page =  page == "" ? "0": page;
         return parseInt(page);
-     }
+      }
 
     function updateLinks(lastNumber, currentPage){
         var pages = [];
@@ -75,9 +74,12 @@
                 //console.log(JSON.stringify(data));
             }
          });
+         //zero is last
+         pages = pages.sort(function(a,b){a=a==0?Infinity:a;b=b==0?Infinity:b;return b<a});
          $("#pages").empty();
          $.each(pages, function( index, value ) {
-             var pageControl = $( "<li><a href='#"+value+"'>"+index+"</a></li>" );
+             var label = value == 0?"Pastarasis":value;
+             var pageControl = $( "<li><a href='#"+value+"'>"+label+"</a></li>" );
              pageControl.addClass(currentPage == value?"disabled":"active");
              $("#pages").append(pageControl);
          });

@@ -127,8 +127,6 @@ lastNotified = datetime.datetime.now() - datetime.timedelta(weeks=4)
 with open(ALARM_FILE_NAME, 'w') as f:
     f.write(datetime.datetime.now().strftime(DATE_FORMAT))
 
-recordData(datetime.datetime.now())
-
 try:
     while True:
         #input_state = GPIO.input(23)
